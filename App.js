@@ -9,12 +9,8 @@ import { getFirestore, disableNetwork, enableNetwork } from "firebase/firestore"
 import { API_KEY, AUTH_DOMAIN, PROJECT_ID, STORAGE_BUCKET, MESSAGING_SENDER_ID, APP_ID } from '@env';
 import { LogBox, Alert } from "react-native";
 LogBox.ignoreLogs(["AsyncStorage has been extracted from"]);
-
-const Stack = createNativeStackNavigator();
-
-const App = () => {
-  const connectionStatus = useNetInfo();
-
+import { initializeAuth, getReactNativePersistence, getAuth } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
   apiKey: API_KEY,
@@ -26,7 +22,22 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
+let auth;
+if (!getAuth(app)) {
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage)
+  });
+} else {
+  auth = getAuth(app);
+}
+
 const db = getFirestore(app);
+
+const Stack = createNativeStackNavigator();
+
+const App = () => {
+  const connectionStatus = useNetInfo();
 
   useEffect(() => {
     if (connectionStatus.isConnected === false) {
@@ -35,8 +46,8 @@ const db = getFirestore(app);
     } else if (connectionStatus.isConnected === true) {
       enableNetwork(db);
     }
-  }, [connectionStatus.isConnected]); // Added closing bracket here
-  
+  }, [connectionStatus.isConnected]);
+
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="Welcome">
