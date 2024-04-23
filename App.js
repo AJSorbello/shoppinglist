@@ -1,46 +1,48 @@
-// import react Navigation
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import ShoppingLists from './components/ShoppingLists';
-import { LogBox } from 'react-native';
-LogBox.ignoreLogs(["AsyncStorage has been extracted from"]);
 import Welcome from './components/Welcome';
+import { useNetInfo } from '@react-native-community/netinfo';
+import { initializeApp } from "firebase/app";
+import { getFirestore, disableNetwork, enableNetwork } from "firebase/firestore";
+import { API_KEY, AUTH_DOMAIN, PROJECT_ID, STORAGE_BUCKET, MESSAGING_SENDER_ID, APP_ID } from '@env';
+import { LogBox, Alert } from "react-native";
+LogBox.ignoreLogs(["AsyncStorage has been extracted from"]);
 
-// Create the navigator
 const Stack = createNativeStackNavigator();
 
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-import { getFirestore } from "firebase/firestore";
-
 const App = () => {
-  const firebaseConfig = {
-      apiKey: "AIzaSyAsSvJViPZXCulH_NqsrdZNfFByxs4-mDY",
-  authDomain: "shopping-list-demo-64eb4.firebaseapp.com",
-  projectId: "shopping-list-demo-64eb4",
-  storageBucket: "shopping-list-demo-64eb4.appspot.com",
-  messagingSenderId: "218019505952",
-  appId: "1:218019505952:web:7e68ba6543a67481fdd945"
+  const connectionStatus = useNetInfo();
+
+
+const firebaseConfig = {
+  apiKey: API_KEY,
+  authDomain: AUTH_DOMAIN,
+  projectId: PROJECT_ID,
+  storageBucket: STORAGE_BUCKET,
+  messagingSenderId: MESSAGING_SENDER_ID,
+  appId: APP_ID
 };
 
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-  // Initialize Cloud Firestore and get a reference to the service
-  const db = getFirestore(app);
-
-   return (
+  useEffect(() => {
+    if (connectionStatus.isConnected === false) {
+      Alert.alert("Connection Lost!");
+      disableNetwork(db);
+    } else if (connectionStatus.isConnected === true) {
+      enableNetwork(db);
+    }
+  }, [connectionStatus.isConnected]); // Added closing bracket here
+  
+  return (
     <NavigationContainer>
-      <Stack.Navigator
-        initialRouteName="Welcome"
-      >
+      <Stack.Navigator initialRouteName="Welcome">
         <Stack.Screen name="Welcome" component={Welcome} />
-        <Stack.Screen
-          name="ShoppingLists"
-        >
-          {props => <ShoppingLists db={db} {...props} />}
+        <Stack.Screen name="ShoppingLists">
+          {props => <ShoppingLists isConnected={connectionStatus.isConnected} db={db} {...props} />}
         </Stack.Screen>
       </Stack.Navigator>
     </NavigationContainer>

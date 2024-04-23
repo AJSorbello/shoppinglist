@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
 import { collection, addDoc, onSnapshot, query, where } from "firebase/firestore";
 import { StyleSheet, View, FlatList, Text, TextInput, KeyboardAvoidingView,
-  TouchableOpacity, Platform, Alert // Moved Platform here
-} from "react-native";
+  TouchableOpacity, Platform, Alert } from "react-native";
+  import { LogBox } from "react-native";
+LogBox.ignoreLogs(["AsyncStorage has been extracted from"]);
 
-const ShoppingLists = ({ db, route }) => {
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const ShoppingLists = ({ db, route, isConnected }) => {
   const { userID } = route.params;
 
   const [lists, setLists] = useState([]);
@@ -21,23 +24,43 @@ const addShoppingList = async (newList) => {
     } else {
       Alert.alert("Unable to add. Please try later");
     }
-  }
-useEffect(() => {
-    const q = query(collection(db, "shoppinglists"), where("uid", "==", userID));
-    const unsubShoppinglists = onSnapshot(q, (documentsSnapshot) => {
-      let newLists = [];
-      documentsSnapshot.forEach(doc => {
-        newLists.push({ id: doc.id, ...doc.data() })
+  };
+
+    let unsubShoppinglists;
+  useEffect(() => {
+    if (isConnected === true) {
+       // unregister current onSnapshot() listener to avoid registering multiple listeners when
+      // useEffect code is re-executed.
+      if (unsubShoppinglists) unsubShoppinglists();
+      unsubShoppinglists = null;
+      const q = query
+      (collection(db, "shoppinglists"), where("uid", "==", userID));
+      unsubShoppinglists = onSnapshot(q, (documentsSnapshot) => {
+        let newLists = [];
+        documentsSnapshot.forEach(doc => {
+          newLists.push({ id: doc.id, ...doc.data() })
+        });
+        cacheShoppingLists(newLists);
+        setLists(newLists);
       });
-      setLists(newLists);
-    });
+    } else loadCachedLists();
 
     // Clean up code
     return () => {
       if (unsubShoppinglists) unsubShoppinglists();
     }
-  }, []);
-
+  }, [isConnected]);
+   const loadCachedLists = async () => {
+    const cachedLists = await AsyncStorage.getItem("shopping_lists") || [];
+    setLists(JSON.parse(cachedLists));
+  }
+ const cacheShoppingLists = async (listsToCache) => {
+    try {
+      await AsyncStorage.setItem('shopping_lists', JSON.stringify(listsToCache));
+    } catch (error) {
+      console.log(error.message);
+    }
+  }
  return (
     <View style={styles.container}>
       <FlatList
@@ -49,6 +72,7 @@ useEffect(() => {
           </View>
         }
       />
+       {(isConnected === true) ?
       <View style={styles.listForm}>
         <TextInput
           style={styles.listName}
@@ -81,7 +105,7 @@ useEffect(() => {
         >
           <Text style={styles.addButtonText}>Add</Text>
         </TouchableOpacity>
-      </View>
+      </View> : null}
       {Platform.OS === "ios" ? <KeyboardAvoidingView behavior="padding" /> : null}
     </View>
   )
